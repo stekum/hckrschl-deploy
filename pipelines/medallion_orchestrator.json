@@ -1,0 +1,259 @@
+{
+  "name": "medallion_orchestrator",
+  "description": "Main orchestration pipeline for Hackerschool Medallion Architecture",
+  "properties": {
+    "activities": [
+      {
+        "name": "Set_Environment",
+        "type": "SetVariable",
+        "dependsOn": [],
+        "policy": {
+          "timeout": "0.00:05:00",
+          "retry": 0
+        },
+        "typeProperties": {
+          "variableName": "environment",
+          "value": {
+            "value": "@pipeline().parameters.environment",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Set_RunId",
+        "type": "SetVariable",
+        "dependsOn": [
+          {
+            "activity": "Set_Environment",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "typeProperties": {
+          "variableName": "run_id",
+          "value": {
+            "value": "@concat(formatDateTime(utcnow(), 'yyyyMMdd_HHmmss'), '_', guid())",
+            "type": "Expression"
+          }
+        }
+      },
+      {
+        "name": "Bronze_to_Silver_Contact",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set_RunId",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "bronze_to_silver_contact",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          },
+          "snapshot": true
+        }
+      },
+      {
+        "name": "Bronze_to_Silver_Account",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set_RunId",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "bronze_to_silver_account",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          },
+          "snapshot": true
+        },
+        "comment": "To be implemented - follows same pattern as contact"
+      },
+      {
+        "name": "Bronze_to_Silver_Course",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Set_RunId",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "bronze_to_silver_hs_course",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          },
+          "snapshot": true
+        },
+        "comment": "To be implemented - follows same pattern as contact"
+      },
+      {
+        "name": "Silver_to_Gold_Contact_SCD",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Bronze_to_Silver_Contact",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "silver_to_gold_scd_contact",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          },
+          "snapshot": true
+        }
+      },
+      {
+        "name": "Silver_to_Gold_Account_SCD",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Bronze_to_Silver_Account",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.02:00:00",
+          "retry": 2,
+          "retryIntervalInSeconds": 30
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "silver_to_gold_scd_account",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          },
+          "snapshot": true
+        },
+        "comment": "To be implemented - follows same pattern as contact SCD"
+      },
+      {
+        "name": "Check_Error_Rate",
+        "type": "SynapseNotebook",
+        "dependsOn": [
+          {
+            "activity": "Silver_to_Gold_Contact_SCD",
+            "dependencyConditions": ["Succeeded"]
+          },
+          {
+            "activity": "Silver_to_Gold_Account_SCD",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ],
+        "policy": {
+          "timeout": "0.00:10:00",
+          "retry": 0
+        },
+        "typeProperties": {
+          "notebook": {
+            "referenceName": "check_pipeline_health",
+            "type": "NotebookReference"
+          },
+          "parameters": {
+            "run_id": {
+              "value": "@variables('run_id')",
+              "type": "Expression"
+            },
+            "environment": {
+              "value": "@variables('environment')",
+              "type": "Expression"
+            }
+          }
+        },
+        "comment": "To be implemented - validates error rates and sends alerts if needed"
+      }
+    ],
+    "parameters": {
+      "environment": {
+        "type": "String",
+        "defaultValue": "dev"
+      }
+    },
+    "variables": {
+      "environment": {
+        "type": "String"
+      },
+      "run_id": {
+        "type": "String"
+      }
+    },
+    "folder": {
+      "name": "Medallion"
+    },
+    "annotations": [
+      "medallion",
+      "bronze-silver-gold",
+      "hackerschool"
+    ]
+  },
+  "schedule": {
+    "startTime": "2025-01-01T02:00:00Z",
+    "recurrence": {
+      "frequency": "Day",
+      "interval": 1,
+      "schedule": {
+        "hours": [2],
+        "minutes": [0]
+      },
+      "timeZone": "UTC"
+    }
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "Generated from deployment plan",
+    "last_updated": "2025-10-26",
+    "documentation": "https://github.com/hackerschool/fabric-medallion"
+  }
+}

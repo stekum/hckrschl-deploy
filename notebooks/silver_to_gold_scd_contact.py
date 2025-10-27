@@ -189,19 +189,23 @@ else:
 if not target_exists:
     print("\n🔄 Starting initial load...")
 
-    # Create initial version with auto-increment surrogate key
-    # Note: We'll use Delta's IDENTITY column feature
+    # Create initial version with surrogate key
+    # Using monotonically_increasing_id() for Fabric compatibility
     try:
+        # Add surrogate key to dataframe
+        df_with_sk = df_source_prepared.withColumn(
+            SURROGATE_KEY,
+            F.monotonically_increasing_id()
+        )
+
+        # Reorder columns to put surrogate key first
+        cols = [SURROGATE_KEY] + [c for c in df_source_prepared.columns]
+        df_with_sk = df_with_sk.select(cols)
+
         # Write initial data
-        df_source_prepared.write.mode("overwrite").saveAsTable(TARGET_TABLE)
+        df_with_sk.write.mode("overwrite").saveAsTable(TARGET_TABLE)
 
-        # Add surrogate key column (Delta IDENTITY)
-        spark.sql(f"""
-            ALTER TABLE {TARGET_TABLE}
-            ADD COLUMN {SURROGATE_KEY} BIGINT GENERATED ALWAYS AS IDENTITY (START WITH 1 INCREMENT BY 1)
-        """)
-
-        records_inserted = df_source_prepared.count()
+        records_inserted = df_with_sk.count()
 
         print(f"✅ Initial load completed")
         print(f"   Records inserted: {records_inserted:,}")
@@ -281,6 +285,16 @@ if target_exists:
                 how="inner"
             )
 
+            # Add surrogate key
+            # Get max existing SK and add incrementally
+            max_sk = spark.sql(f"SELECT COALESCE(MAX({SURROGATE_KEY}), 0) as max_sk FROM {TARGET_TABLE}").collect()[0]['max_sk']
+
+            df_new_versions = df_new_versions.withColumn(
+                "row_id", F.monotonically_increasing_id()
+            ).withColumn(
+                SURROGATE_KEY, F.lit(max_sk) + F.col("row_id") + 1
+            ).drop("row_id")
+
             df_new_versions.write.mode("append").saveAsTable(TARGET_TABLE)
             print(f"   ✓ Inserted {changed_count:,} new versions")
 
@@ -300,6 +314,15 @@ if target_exists:
         new_count = df_new_records.count()
 
         if new_count > 0:
+            # Add surrogate key
+            max_sk = spark.sql(f"SELECT COALESCE(MAX({SURROGATE_KEY}), 0) as max_sk FROM {TARGET_TABLE}").collect()[0]['max_sk']
+
+            df_new_records = df_new_records.withColumn(
+                "row_id", F.monotonically_increasing_id()
+            ).withColumn(
+                SURROGATE_KEY, F.lit(max_sk) + F.col("row_id") + 1
+            ).drop("row_id")
+
             df_new_records.write.mode("append").saveAsTable(TARGET_TABLE)
             print(f"   ✓ Inserted {new_count:,} new records")
         else:

@@ -1,0 +1,52 @@
+{
+  "environment": "dev",
+  "fabric_workspace": "hs-fabric-dev",
+
+  "lakehouses": {
+    "bronze": "hs_bronze_dev",
+    "silver": "hs_silver_dev",
+    "gold": "hs_gold_dev",
+    "monitoring": "hs_monitoring_dev"
+  },
+
+  "dataverse": {
+    "link_name": "hs_shareddev",
+    "environment_url": "https://org########.crm4.dynamics.com"
+  },
+
+  "pipeline": {
+    "schedule": "0 2 * * *",
+    "schedule_description": "Daily at 2:00 AM UTC",
+    "timeout_minutes": 120,
+    "retry_count": 3,
+    "concurrent_notebooks": 2
+  },
+
+  "data_quality": {
+    "error_threshold": 0.10,
+    "quarantine_retention_days": 90,
+    "alert_on_failure": true,
+    "alert_recipients": ["data-team@hackerschool.de"]
+  },
+
+  "performance": {
+    "batch_size": 1000,
+    "shuffle_partitions": 200,
+    "auto_optimize": true,
+    "z_order_columns": ["contactid", "accountid", "hs_courseid"]
+  },
+
+  "features": {
+    "enable_scd2": true,
+    "enable_quarantine": true,
+    "enable_metrics": true,
+    "enable_lineage": false,
+    "enable_profiling": false
+  },
+
+  "monitoring": {
+    "log_level": "INFO",
+    "enable_delta_history": true,
+    "metrics_retention_days": 365
+  }
+}
